@@ -444,7 +444,7 @@
       </div>
       <div id="photo-empty" class="zone-empty">
         <span class="zone-empty-icon">📷</span>
-        <div class="zone-empty-label">ダブルクリックまたはドラッグ＆ドロップ</div>
+        <div class="zone-empty-label">クリックまたはドラッグ＆ドロップ</div>
         <div class="zone-empty-hint">JPG / PNG 複数可</div>
       </div>
       <div class="photo-grid" id="photo-grid"></div>
@@ -459,7 +459,7 @@
       </div>
       <div id="template-empty" class="zone-empty">
         <span class="zone-empty-icon">📄</span>
-        <div class="zone-empty-label">ダブルクリックまたはドラッグ＆ドロップ</div>
+        <div class="zone-empty-label">クリックまたはドラッグ＆ドロップ</div>
         <div class="zone-empty-hint">.xlsx ファイル</div>
       </div>
       <div id="template-info"></div>
@@ -501,8 +501,8 @@
  
   // --- ドロップゾーン共通 ---
   function setupDropZone(zone, input, onFiles) {
-    // ダブルクリックでファイル選択ダイアログを開く
-    zone.addEventListener('dblclick', (e) => {
+    // クリックでファイル選択ダイアログを開く
+    zone.addEventListener('click', (e) => {
       if (e.target.closest('.zone-clear') || e.target.closest('.thumb-remove')) return;
       input.click();
     });
@@ -815,4 +815,3 @@
 </script>
 </body>
 </html>
- 
