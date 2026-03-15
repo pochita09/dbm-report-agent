@@ -738,7 +738,7 @@
       // 自動ダウンロード
       const a = document.createElement('a');
       a.href = d.download_url;
-      a.download = '';
+      a.download = d.download_name || '';
       document.body.appendChild(a);
       a.click();
       a.remove();

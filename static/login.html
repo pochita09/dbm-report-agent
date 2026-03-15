@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ログイン - 作業報告書 写真配置ツール</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+  :root {
+    --bg: #f0f4f0;
+    --surface: #ffffff;
+    --border: #c8d8c8;
+    --text: #2c2c2c;
+    --text-sub: #6b7b6b;
+    --accent: #3cc8a0;
+    --accent-hover: #2fb88e;
+    --error: #e05555;
+    --radius: 12px;
+  }
+ 
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+ 
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px 36px;
+    width: 100%;
+    max-width: 380px;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+    text-align: center;
+  }
+ 
+  .login-card h1 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+ 
+  .login-card p {
+    font-size: 13px;
+    color: var(--text-sub);
+    margin-bottom: 28px;
+  }
+ 
+  .login-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-family: inherit;
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 16px;
+  }
+ 
+  .login-input:focus {
+    border-color: var(--accent);
+  }
+ 
+  .login-btn {
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 14px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: inherit;
+    border-radius: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.03em;
+  }
+ 
+  .login-btn:hover {
+    background: var(--accent-hover);
+  }
+ 
+  .login-error {
+    color: var(--error);
+    font-size: 13px;
+    margin-top: 12px;
+    display: none;
+  }
+ 
+  .login-error.visible {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <h1>作業報告書 写真配置ツール</h1>
+  <p>パスワードを入力してください</p>
+  <input type="password" class="login-input" id="password" placeholder="パスワード" autofocus>
+  <button class="login-btn" id="login-btn">ログイン</button>
+  <div class="login-error" id="error-msg"></div>
+</div>
+<script>
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('login-btn');
+  const errorMsg = document.getElementById('error-msg');
+ 
+  async function doLogin() {
+    const password = passwordInput.value;
+    if (!password) return;
+ 
+    loginBtn.textContent = '確認中...';
+    loginBtn.disabled = true;
+ 
+    try {
+      const res = await fetch('/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+ 
+      if (data.ok) {
+        window.location.href = '/';
+      } else {
+        errorMsg.textContent = data.error || 'パスワードが違います';
+        errorMsg.classList.add('visible');
+        passwordInput.value = '';
+        passwordInput.focus();
+      }
+    } catch (e) {
+      errorMsg.textContent = '通信エラーが発生しました';
+      errorMsg.classList.add('visible');
+    }
+ 
+    loginBtn.textContent = 'ログイン';
+    loginBtn.disabled = false;
+  }
+ 
+  loginBtn.addEventListener('click', doLogin);
+  passwordInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+</script>
+</body>
+</html>

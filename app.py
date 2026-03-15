@@ -9,9 +9,11 @@ import json
 import uuid
 import tempfile
 import traceback
+import secrets
 from pathlib import Path
+from functools import wraps
  
-from flask import Flask, request, jsonify, send_file, Response, stream_with_context
+from flask import Flask, request, jsonify, send_file, Response, stream_with_context, session, redirect, url_for
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
  
@@ -19,20 +21,59 @@ load_dotenv()
  
 app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100MB
+app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
  
 # 一時ファイル管理用
 UPLOAD_DIR = tempfile.mkdtemp(prefix="dbm_agent_")
 RESULT_DIR = tempfile.mkdtemp(prefix="dbm_result_")
  
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
+ 
+# セッション内の元ファイル名を保持する辞書
+original_names = {}
+ 
+ 
+# ============================================================
+# パスワード認証
+# ============================================================
+ 
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not APP_PASSWORD:
+            return f(*args, **kwargs)
+        if not session.get("authenticated"):
+            return redirect(url_for("login_page"))
+        return f(*args, **kwargs)
+    return decorated
+ 
+ 
+@app.route("/login", methods=["GET"])
+def login_page():
+    if not APP_PASSWORD:
+        return redirect(url_for("index"))
+    return send_file("static/login.html")
+ 
+ 
+@app.route("/login", methods=["POST"])
+def login_submit():
+    data = request.get_json() or {}
+    password = data.get("password", "")
+    if password == APP_PASSWORD:
+        session["authenticated"] = True
+        return jsonify({"ok": True})
+    return jsonify({"ok": False, "error": "パスワードが違います"}), 401
  
  
 @app.route("/")
+@login_required
 def index():
     return send_file("static/index.html")
  
  
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload():
     """写真とテンプレートをアップロードし、セッションIDを返す"""
     session_id = str(uuid.uuid4())
@@ -45,6 +86,11 @@ def upload():
     if not template_file:
         return jsonify({"error": "テンプレートが選択されていません"}), 400
  
+    # 元のファイル名を保持（日本語含む）
+    original_template_name = template_file.filename or "template.xlsx"
+    original_names[session_id] = original_template_name
+ 
+    # サーバー保存用にはsecure_filenameを使用
     template_name = secure_filename(template_file.filename) or "template.xlsx"
     template_path = session_dir / template_name
     template_file.save(str(template_path))
@@ -69,6 +115,7 @@ def upload():
  
  
 @app.route("/process/<session_id>")
+@login_required
 def process(session_id):
     """SSEで処理の進行状況を配信する"""
     session_dir = Path(UPLOAD_DIR) / session_id
@@ -95,6 +142,9 @@ def process(session_id):
         str(f) for f in photo_dir.iterdir()
         if f.suffix.lower() in exts
     ])
+ 
+    # ダウンロード用ファイル名（元のテンプレート名を使用）
+    download_name = original_names.get(session_id, "output.xlsx")
  
     def generate():
         try:
@@ -123,12 +173,16 @@ def process(session_id):
             # Step 3: 写真配置
             yield sse_event("progress", {"step": "place", "message": "Excelに写真を配置中..."})
  
-            output_name = f"output_{session_id[:8]}.xlsx"
-            output_path = str(Path(RESULT_DIR) / output_name)
+            # 保存用ファイル名はsession_idベース（一意性確保）
+            save_name = f"output_{session_id[:8]}.xlsx"
+            output_path = str(Path(RESULT_DIR) / save_name)
             place_photos(template_path, output_path, assigned)
  
             yield sse_event("progress", {"step": "done", "message": "完了! ダウンロードを開始します"})
-            yield sse_event("complete", {"download_url": f"/download/{session_id}/{output_name}"})
+            yield sse_event("complete", {
+                "download_url": f"/download/{session_id}/{save_name}",
+                "download_name": download_name,
+            })
  
         except Exception as e:
             traceback.print_exc()
@@ -145,15 +199,20 @@ def process(session_id):
  
  
 @app.route("/download/<session_id>/<filename>")
+@login_required
 def download(session_id, filename):
     """生成されたExcelファイルをダウンロード"""
     filepath = Path(RESULT_DIR) / filename
     if not filepath.exists():
         return jsonify({"error": "ファイルが見つかりません"}), 404
+ 
+    # 元のテンプレートファイル名でダウンロード
+    dl_name = original_names.get(session_id, filename)
+ 
     return send_file(
         str(filepath),
         as_attachment=True,
-        download_name=filename,
+        download_name=dl_name,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
  
