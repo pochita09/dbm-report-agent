@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業報告書 写真配置ツール</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
+ 
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+ 
+  :root {
+    --bg: #f0f4f0;
+    --surface: #ffffff;
+    --border: #c8d8c8;
+    --border-light: #dde8dd;
+    --text: #2c2c2c;
+    --text-sub: #6b7b6b;
+    --accent: #3cc8a0;
+    --accent-hover: #2fb88e;
+    --accent-light: #e6f9f2;
+    --success: #3cc8a0;
+    --error: #e05555;
+    --drop-bg: #ffffff;
+    --drop-active: #f0faf6;
+    --drop-border: #3cc8a0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 4px rgba(0,0,0,0.06);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  }
+ 
+  body {
+    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px 16px;
+  }
+ 
+  .container {
+    max-width: 1040px;
+    margin: 0 auto;
+  }
+ 
+  /* ヘッダー */
+  header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+ 
+  header h1 {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--text);
+  }
+ 
+  header p {
+    font-size: 13px;
+    color: var(--text-sub);
+    margin-top: 4px;
+  }
+ 
+  /* ドロップゾーン */
+  .drop-zones {
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+ 
+  .drop-zone {
+    background: var(--drop-bg);
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    min-height: 200px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+ 
+  .drop-zone:hover {
+    border-color: var(--accent);
+    background: var(--drop-active);
+  }
+ 
+  .drop-zone.dragover {
+    border-color: var(--drop-border);
+    background: var(--drop-active);
+    border-style: solid;
+  }
+ 
+  .drop-zone.has-files {
+    border-color: var(--success);
+    border-style: solid;
+  }
+ 
+  .drop-zone input[type="file"] {
+    display: none;
+  }
+ 
+  /* ゾーンヘッダー */
+  .zone-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+    gap: 8px;
+  }
+ 
+  .zone-title {
+    font-size: 15px;
+    font-weight: 700;
+  }
+ 
+  .zone-badge {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-light);
+    padding: 2px 10px;
+    border-radius: 12px;
+    display: none;
+  }
+ 
+  .zone-badge.visible { display: inline-block; }
+ 
+  .zone-clear {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--accent);
+    cursor: pointer;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-weight: 500;
+    display: none;
+    padding: 2px 4px;
+  }
+ 
+  .zone-clear:hover { text-decoration: underline; }
+  .zone-clear.visible { display: inline-block; }
+ 
+  /* 空状態 */
+  .zone-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 16px;
+    text-align: center;
+  }
+ 
+  .zone-empty-icon {
+    font-size: 40px;
+    margin-bottom: 12px;
+    opacity: 0.4;
+  }
+ 
+  .zone-empty-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-sub);
+    margin-bottom: 4px;
+  }
+ 
+  .zone-empty-hint {
+    font-size: 12px;
+    color: var(--text-sub);
+    opacity: 0.7;
+  }
+ 
+  /* 追加ボタン（ファイルがある状態で表示） */
+  .zone-add-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    aspect-ratio: 1;
+    background: var(--accent-light);
+    border: 2px dashed var(--accent);
+    cursor: pointer;
+    color: var(--accent);
+    font-size: 28px;
+    font-weight: 300;
+    transition: all 0.15s;
+  }
+ 
+  .zone-add-btn:hover {
+    background: #d0f0e6;
+    border-color: var(--accent-hover);
+  }
+ 
+  /* 写真サムネイルグリッド */
+  .photo-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 8px;
+  }
+ 
+  .thumb-item {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    aspect-ratio: 1;
+    background: #f0f0ee;
+  }
+ 
+  .thumb-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: opacity 0.15s;
+  }
+ 
+  .thumb-item:hover img {
+    opacity: 0.85;
+  }
+ 
+  .thumb-name {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(transparent, rgba(0,0,0,0.65));
+    color: #fff;
+    font-size: 10px;
+    padding: 14px 5px 4px;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+ 
+  .thumb-remove {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    border: none;
+    font-size: 12px;
+    line-height: 20px;
+    text-align: center;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+    padding: 0;
+    font-family: inherit;
+  }
+ 
+  .thumb-item:hover .thumb-remove {
+    opacity: 1;
+  }
+ 
+  .thumb-remove:hover {
+    background: rgba(220,50,50,0.8);
+  }
+ 
+  /* テンプレートファイル表示 */
+  .template-file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #f8faf8;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-light);
+  }
+ 
+  .template-file-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+ 
+  .template-file-icon svg {
+    width: 36px;
+    height: 36px;
+  }
+ 
+  .template-file-detail {
+    flex: 1;
+    min-width: 0;
+  }
+ 
+  .template-file-name {
+    font-size: 13px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+ 
+  .template-file-size {
+    font-size: 11px;
+    color: var(--text-sub);
+    margin-top: 2px;
+  }
+ 
+  /* ペースト案内 */
+  .paste-hint {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-sub);
+    margin-bottom: 20px;
+    opacity: 0.7;
+  }
+ 
+  /* 実行ボタン */
+  .actions {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+ 
+  #btn-run {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 16px 56px;
+    font-size: 16px;
+    font-weight: 700;
+    border-radius: 28px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    box-shadow: 0 2px 8px rgba(60,200,160,0.3);
+  }
+ 
+  #btn-run:hover:not(:disabled) {
+    background: var(--accent-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(60,200,160,0.35);
+  }
+ 
+  #btn-run:disabled {
+    background: #b0c0b8;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+ 
+  /* 進行状況パネル */
+  #progress-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow);
+  }
+ 
+  #progress-panel.visible {
+    display: block;
+  }
+ 
+  #progress-panel h3 {
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+ 
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    display: inline-block;
+  }
+ 
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+ 
+  #progress-log {
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text-sub);
+    max-height: 300px;
+    overflow-y: auto;
+  }
+ 
+  #progress-log .log-line {
+    padding: 2px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+  }
+ 
+  #progress-log .log-line .log-icon {
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+  }
+ 
+  #progress-log .log-line.step-done .log-icon { color: var(--success); }
+  #progress-log .log-line.step-active .log-icon { color: var(--accent); }
+  #progress-log .log-line.step-error .log-icon { color: var(--error); }
+  #progress-log .log-line.step-detail { padding-left: 26px; font-size: 12px; color: #888; }
+ 
+  /* 完了状態 */
+  #progress-panel.completed {
+    border-color: var(--success);
+    background: var(--accent-light);
+  }
+ 
+  #progress-panel.errored {
+    border-color: var(--error);
+    background: #fef2f2;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>作業報告書 写真配置ツール</h1>
+    <p>テンプレートと作業写真をドロップして実行</p>
+  </header>
+ 
+  <div class="drop-zones">
+    <!-- 写真ドロップゾーン -->
+    <div class="drop-zone" id="drop-photos">
+      <input type="file" id="input-photos" multiple accept=".jpg,.jpeg,.png">
+      <div class="zone-header">
+        <span class="zone-title">現場写真</span>
+        <span class="zone-badge" id="photo-badge"></span>
+        <button class="zone-clear" id="photo-clear">クリア</button>
+      </div>
+      <div id="photo-empty" class="zone-empty">
+        <span class="zone-empty-icon">📷</span>
+        <div class="zone-empty-label">ダブルクリックまたはドラッグ＆ドロップ</div>
+        <div class="zone-empty-hint">JPG / PNG 複数可</div>
+      </div>
+      <div class="photo-grid" id="photo-grid"></div>
+    </div>
+ 
+    <!-- テンプレートドロップゾーン -->
+    <div class="drop-zone" id="drop-template">
+      <input type="file" id="input-template" accept=".xlsx">
+      <div class="zone-header">
+        <span class="zone-title">フォーマット</span>
+        <button class="zone-clear" id="template-clear">クリア</button>
+      </div>
+      <div id="template-empty" class="zone-empty">
+        <span class="zone-empty-icon">📄</span>
+        <div class="zone-empty-label">ダブルクリックまたはドラッグ＆ドロップ</div>
+        <div class="zone-empty-hint">.xlsx ファイル</div>
+      </div>
+      <div id="template-info"></div>
+    </div>
+  </div>
+ 
+  <div class="paste-hint">ファイルをコピーして Ctrl+V でもペースト可能</div>
+ 
+  <div class="actions">
+    <button id="btn-run" disabled>報告書を作成する</button>
+  </div>
+ 
+  <div id="progress-panel">
+    <h3><span class="spinner" id="spinner"></span> <span id="progress-title">処理中...</span></h3>
+    <div id="progress-log"></div>
+  </div>
+</div>
+ 
+<script>
+  const dropPhotos = document.getElementById('drop-photos');
+  const dropTemplate = document.getElementById('drop-template');
+  const inputPhotos = document.getElementById('input-photos');
+  const inputTemplate = document.getElementById('input-template');
+  const photoGrid = document.getElementById('photo-grid');
+  const photoEmpty = document.getElementById('photo-empty');
+  const photoBadge = document.getElementById('photo-badge');
+  const photoClear = document.getElementById('photo-clear');
+  const templateEmpty = document.getElementById('template-empty');
+  const templateInfo = document.getElementById('template-info');
+  const templateClear = document.getElementById('template-clear');
+  const btnRun = document.getElementById('btn-run');
+  const progressPanel = document.getElementById('progress-panel');
+  const progressLog = document.getElementById('progress-log');
+  const progressTitle = document.getElementById('progress-title');
+  const spinner = document.getElementById('spinner');
+ 
+  let photoFiles = [];
+  let templateFile = null;
+ 
+  // --- ドロップゾーン共通 ---
+  function setupDropZone(zone, input, onFiles) {
+    // ダブルクリックでファイル選択ダイアログを開く
+    zone.addEventListener('dblclick', (e) => {
+      if (e.target.closest('.zone-clear') || e.target.closest('.thumb-remove')) return;
+      input.click();
+    });
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      onFiles(e.dataTransfer.files);
+    });
+    input.addEventListener('change', () => { if (input.files.length) onFiles(input.files); });
+  }
+ 
+  // --- 写真 ---
+  function renderPhotoGrid() {
+    photoGrid.innerHTML = '';
+    photoFiles.forEach((f, i) => {
+      const div = document.createElement('div');
+      div.className = 'thumb-item';
+ 
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      img.alt = f.name;
+      img.onload = () => URL.revokeObjectURL(img.src);
+ 
+      const name = document.createElement('div');
+      name.className = 'thumb-name';
+      name.textContent = f.name;
+ 
+      const btn = document.createElement('button');
+      btn.className = 'thumb-remove';
+      btn.textContent = '×';
+      btn.title = '削除';
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        photoFiles.splice(i, 1);
+        renderPhotoGrid();
+        updatePhotoUI();
+        updateButton();
+      });
+ 
+      div.appendChild(img);
+      div.appendChild(name);
+      div.appendChild(btn);
+      photoGrid.appendChild(div);
+    });
+ 
+    // ファイルがあるときだけ「＋追加」ボタンをグリッド末尾に表示
+    if (photoFiles.length > 0) {
+      const addDiv = document.createElement('div');
+      addDiv.className = 'zone-add-btn';
+      addDiv.style.display = 'flex';
+      addDiv.textContent = '＋';
+      addDiv.title = '写真を追加';
+      photoGrid.appendChild(addDiv);
+    }
+  }
+ 
+  function updatePhotoUI() {
+    const hasFiles = photoFiles.length > 0;
+    photoEmpty.style.display = hasFiles ? 'none' : 'flex';
+    photoGrid.style.display = hasFiles ? 'grid' : 'none';
+    photoBadge.textContent = photoFiles.length + '枚';
+    photoBadge.classList.toggle('visible', hasFiles);
+    photoClear.classList.toggle('visible', hasFiles);
+    dropPhotos.classList.toggle('has-files', hasFiles);
+  }
+ 
+  const onPhotoFiles = (files) => {
+    const newFiles = Array.from(files).filter(f => /\.(jpe?g|png)$/i.test(f.name));
+    // 追加モード（既存ファイルに追加）
+    photoFiles = photoFiles.concat(newFiles);
+    renderPhotoGrid();
+    updatePhotoUI();
+    updateButton();
+  };
+ 
+  setupDropZone(dropPhotos, inputPhotos, onPhotoFiles);
+ 
+  photoClear.addEventListener('click', (e) => {
+    e.stopPropagation();
+    photoFiles = [];
+    renderPhotoGrid();
+    updatePhotoUI();
+    updateButton();
+    inputPhotos.value = '';
+  });
+ 
+  // --- テンプレート ---
+  function formatFileSize(bytes) {
+    if (bytes < 1024) return bytes + ' B';
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+ 
+  function renderTemplateInfo() {
+    if (!templateFile) {
+      templateInfo.innerHTML = '';
+      return;
+    }
+    const excelIcon = `<svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="4" y="4" width="40" height="40" rx="4" fill="#21a366"/>
+      <path d="M14 16h6l4 6.5L28.5 16H34L28 25l6.5 9H28.5l-4.5-7-4.5 7H14l6.5-9L14 16z" fill="white"/>
+    </svg>`;
+    templateInfo.innerHTML = `
+      <div class="template-file-info">
+        <div class="template-file-icon">${excelIcon}</div>
+        <div class="template-file-detail">
+          <div class="template-file-name">${esc(templateFile.name)}</div>
+          <div class="template-file-size">${formatFileSize(templateFile.size)}</div>
+        </div>
+      </div>
+    `;
+  }
+ 
+  function updateTemplateUI() {
+    const hasFile = !!templateFile;
+    templateEmpty.style.display = hasFile ? 'none' : 'flex';
+    templateInfo.style.display = hasFile ? 'block' : 'none';
+    templateClear.classList.toggle('visible', hasFile);
+    dropTemplate.classList.toggle('has-files', hasFile);
+  }
+ 
+  const onTemplateFiles = (files) => {
+    const xlsx = Array.from(files).find(f => /\.xlsx$/i.test(f.name));
+    if (xlsx) {
+      templateFile = xlsx;
+      renderTemplateInfo();
+      updateTemplateUI();
+      updateButton();
+    }
+  };
+ 
+  setupDropZone(dropTemplate, inputTemplate, onTemplateFiles);
+ 
+  templateClear.addEventListener('click', (e) => {
+    e.stopPropagation();
+    templateFile = null;
+    renderTemplateInfo();
+    updateTemplateUI();
+    updateButton();
+    inputTemplate.value = '';
+  });
+ 
+  // --- コピー＆ペースト対応（ダイアログが開かないように修正） ---
+  document.addEventListener('paste', (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+ 
+    const photos = [];
+    const templates = [];
+ 
+    for (const item of items) {
+      if (item.kind !== 'file') continue;
+      const file = item.getAsFile();
+      if (!file) continue;
+      if (/\.(jpe?g|png)$/i.test(file.name)) {
+        photos.push(file);
+      } else if (/\.xlsx$/i.test(file.name)) {
+        templates.push(file);
+      }
+    }
+ 
+    if (photos.length > 0 || templates.length > 0) {
+      if (photos.length > 0) onPhotoFiles(photos);
+      if (templates.length > 0) onTemplateFiles(templates);
+    }
+  });
+ 
+  function updateButton() {
+    btnRun.disabled = !(photoFiles.length > 0 && templateFile);
+  }
+ 
+  // --- 初期状態 ---
+  updatePhotoUI();
+  updateTemplateUI();
+ 
+  // --- 実行 ---
+  btnRun.addEventListener('click', async () => {
+    if (btnRun.disabled) return;
+    btnRun.disabled = true;
+    progressPanel.classList.add('visible');
+    progressPanel.classList.remove('completed', 'errored');
+    progressLog.innerHTML = '';
+    spinner.style.display = '';
+    progressTitle.textContent = '処理中...';
+ 
+    // 1. アップロード
+    addLog('ファイルをアップロード中...', 'active');
+ 
+    const formData = new FormData();
+    formData.append('template', templateFile);
+    photoFiles.forEach(f => formData.append('photos', f));
+ 
+    let sessionId;
+    try {
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      sessionId = data.session_id;
+      markLastDone(`アップロード完了（写真${data.photo_count}枚）`);
+    } catch (e) {
+      markLastError(`アップロード失敗: ${e.message}`);
+      onError();
+      return;
+    }
+ 
+    // 2. SSEで処理開始
+    const evtSource = new EventSource(`/process/${sessionId}`);
+ 
+    evtSource.addEventListener('progress', (e) => {
+      const d = JSON.parse(e.data);
+      if (d.step === 'done') {
+        markLastDone(d.message);
+      } else {
+        addLog(d.message, 'active');
+      }
+    });
+ 
+    evtSource.addEventListener('details', (e) => {
+      const d = JSON.parse(e.data);
+      d.assignments.forEach(line => addLog(line, 'detail'));
+    });
+ 
+    evtSource.addEventListener('complete', (e) => {
+      evtSource.close();
+      const d = JSON.parse(e.data);
+      spinner.style.display = 'none';
+      progressTitle.textContent = '完了';
+      progressPanel.classList.add('completed');
+      btnRun.disabled = false;
+ 
+      // 自動ダウンロード
+      const a = document.createElement('a');
+      a.href = d.download_url;
+      a.download = '';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+ 
+      addLog('ダウンロードを開始しました', 'done');
+    });
+ 
+    evtSource.addEventListener('error_event', (e) => {
+      evtSource.close();
+      const d = JSON.parse(e.data);
+      markLastError(d.message);
+      onError();
+    });
+ 
+    evtSource.onerror = () => {
+      evtSource.close();
+      markLastError('接続が切断されました');
+      onError();
+    };
+  });
+ 
+  function addLog(message, type) {
+    const div = document.createElement('div');
+    div.className = 'log-line';
+    if (type === 'active') {
+      div.classList.add('step-active');
+      div.innerHTML = `<span class="log-icon">●</span> ${esc(message)}`;
+    } else if (type === 'done') {
+      div.classList.add('step-done');
+      div.innerHTML = `<span class="log-icon">✓</span> ${esc(message)}`;
+    } else if (type === 'error') {
+      div.classList.add('step-error');
+      div.innerHTML = `<span class="log-icon">✕</span> ${esc(message)}`;
+    } else if (type === 'detail') {
+      div.classList.add('step-detail');
+      div.textContent = message;
+    }
+    progressLog.appendChild(div);
+    progressLog.scrollTop = progressLog.scrollHeight;
+  }
+ 
+  function markLastDone(msg) {
+    const active = progressLog.querySelector('.step-active:last-of-type');
+    if (active) {
+      active.classList.remove('step-active');
+      active.classList.add('step-done');
+      active.querySelector('.log-icon').textContent = '✓';
+    }
+    if (msg) addLog(msg, 'done');
+  }
+ 
+  function markLastError(msg) {
+    const active = progressLog.querySelector('.step-active:last-of-type');
+    if (active) {
+      active.classList.remove('step-active');
+      active.classList.add('step-error');
+      active.querySelector('.log-icon').textContent = '✕';
+    }
+    addLog(msg, 'error');
+  }
+ 
+  function onError() {
+    spinner.style.display = 'none';
+    progressTitle.textContent = 'エラー';
+    progressPanel.classList.add('errored');
+    btnRun.disabled = false;
+  }
+ 
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+</script>
+</body>
+</html>
+ 
