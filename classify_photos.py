@@ -277,7 +277,7 @@ def call_gemini_api(prompt, photo_paths, api_key):
         "contents": [{"parts": parts}],
         "generationConfig": {
             "temperature": 0.1,  # 分類タスクなので低温
-            "maxOutputTokens": 2048,
+            "maxOutputTokens": 8192,
         },
     }
  
