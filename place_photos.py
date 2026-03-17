@@ -228,7 +228,13 @@ def place_photos(template_path, output_path, photo_paths):
             if not slots:
                 print(f"  スキップ: '{sheet_name}'")
                 continue
- 
+
+            # 既存画像を全て削除（重複配置を防止）
+            existing_count = len(ws._images)
+            if existing_count > 0:
+                ws._images.clear()
+                print(f"  シート '{sheet_name}': 既存画像{existing_count}枚を削除")
+
             print(f"\n  シート '{sheet_name}': {len(slots)}スロットに配置")
  
             photo_iter = iter(photo_paths)
@@ -310,4 +316,3 @@ def place_photos(template_path, output_path, photo_paths):
  
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
- 
