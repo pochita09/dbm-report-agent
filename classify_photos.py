@@ -447,9 +447,13 @@ if __name__ == "__main__":
         print("エラー: .envにGEMINI_API_KEYを設定してください")
         sys.exit(1)
  
-    # テスト用パス（実行環境に合わせて変更）
-    TEMPLATE = r"c:\Users\nyaaa\OneDrive\デスクトップ\報告書テンプレ\20260226_○○現場_ｶﾞﾗｽ定期特別清掃作業報告書.xlsx"
-    PHOTO_DIR = r"c:\Users\nyaaa\OneDrive\デスクトップ\DBM"
+    # テスト用パス（.envで設定）
+    TEMPLATE  = os.environ.get("TEST_TEMPLATE", "")
+    PHOTO_DIR = os.environ.get("TEST_PHOTO_DIR", "")
+
+    if not TEMPLATE or not PHOTO_DIR:
+        print("エラー: .envにTEST_TEMPLATEとTEST_PHOTO_DIRを設定してください")
+        sys.exit(1)
  
     exts = {'.jpg', '.jpeg', '.png'}
     photo_paths = sorted([
@@ -462,10 +466,10 @@ if __name__ == "__main__":
     for p in photo_paths:
         print(f"  {Path(p).name}")
  
-    assigned, parsed_slots = classify_and_assign(TEMPLATE, photo_paths, API_KEY)
+    assigned, parsed_slots, slots_by_sheet = classify_and_assign(TEMPLATE, photo_paths, API_KEY)
  
     # 分類結果を使ってExcelに配置
     if any(p is not None for p in assigned):
-        OUTPUT = r"c:\Users\nyaaa\OneDrive\デスクトップ\test_output_classified.xlsx"
+        OUTPUT = os.environ.get("TEST_OUTPUT", "test_output_classified.xlsx")
         from place_photos import place_photos
-        place_photos(TEMPLATE, OUTPUT, assigned)
+        place_photos(TEMPLATE, OUTPUT, assigned, precomputed_slots=slots_by_sheet)
