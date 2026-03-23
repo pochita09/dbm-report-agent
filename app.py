@@ -168,7 +168,7 @@ def process(session_id):
             # Step 2: AI分類
             yield sse_event("progress", {"step": "classify", "message": f"AI分類中... ({len(photo_paths)}枚の写真を分析)"})
  
-            assigned, parsed_slots = classify_and_assign(template_path, photo_paths, GEMINI_API_KEY)
+            assigned, parsed_slots, slots_by_sheet = classify_and_assign(template_path, photo_paths, GEMINI_API_KEY)
  
             assigned_count = sum(1 for p in assigned if p is not None)
             yield sse_event("progress", {"step": "classified", "message": f"分類完了: {assigned_count}/{len(parsed_slots)}スロットに割り当て"})
@@ -187,7 +187,7 @@ def process(session_id):
             # 保存用ファイル名はsession_idベース（一意性確保）
             save_name = f"output_{session_id[:8]}.xlsx"
             output_path = str(Path(RESULT_DIR) / save_name)
-            place_photos(template_path, output_path, assigned)
+            place_photos(template_path, output_path, assigned, precomputed_slots=slots_by_sheet)
  
             yield sse_event("progress", {"step": "done", "message": "完了! ダウンロードを開始します"})
             yield sse_event("complete", {

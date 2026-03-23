@@ -207,7 +207,7 @@ def make_dummy_png(filepath, width=400, height=300, color=(200, 100, 50), label=
 # 写真配置メイン
 # ============================================================
  
-def place_photos(template_path, output_path, photo_paths):
+def place_photos(template_path, output_path, photo_paths, precomputed_slots=None):
     import tempfile
  
     print(f"\n{'='*60}")
@@ -223,7 +223,10 @@ def place_photos(template_path, output_path, photo_paths):
     try:
         for sheet_name in wb.sheetnames:
             ws = wb[sheet_name]
-            slots, row_heights, col_widths = detect_photo_slots(ws)
+            if precomputed_slots is not None and sheet_name in precomputed_slots:
+                slots = precomputed_slots[sheet_name]
+            else:
+                slots, _, _ = detect_photo_slots(ws)
  
             if not slots:
                 print(f"  スキップ: '{sheet_name}'")
