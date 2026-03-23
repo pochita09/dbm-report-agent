@@ -281,17 +281,20 @@ def call_gemini_api(prompt, photo_paths, api_key):
         },
     }
  
-    # API呼び出し
-    url = f"{GEMINI_API_URL}?key={api_key}"
+    # API呼び出し（APIキーはヘッダーで送信し、ログへの漏洩を防止）
     print(f"  Gemini API呼び出し中... ({len(photo_paths)}枚送信)")
  
     response = requests.post(
-        url,
-        headers={"Content-Type": "application/json"},
+        GEMINI_API_URL,
+        headers={
+            "Content-Type": "application/json",
+            "x-goog-api-key": api_key,
+        },
         json=body,
         timeout=120,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise RuntimeError(f"Gemini API error: {response.status_code} {response.reason}")
     result = response.json()
  
     # レスポンスからテキスト部分を抽出

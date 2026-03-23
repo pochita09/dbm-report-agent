@@ -202,7 +202,10 @@ def process(session_id):
 @login_required
 def download(session_id, filename):
     """生成されたExcelファイルをダウンロード"""
-    filepath = Path(RESULT_DIR) / filename
+    filepath = (Path(RESULT_DIR) / filename).resolve()
+    # パストラバーサル防止: RESULT_DIR配下であることを検証
+    if not str(filepath).startswith(str(Path(RESULT_DIR).resolve())):
+        return jsonify({"error": "不正なパスです"}), 403
     if not filepath.exists():
         return jsonify({"error": "ファイルが見つかりません"}), 404
  
