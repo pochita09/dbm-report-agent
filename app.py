@@ -10,10 +10,13 @@ import uuid
 import tempfile
 import traceback
 import secrets
+import shutil
 from pathlib import Path
 from functools import wraps
  
 from flask import Flask, request, jsonify, send_file, Response, stream_with_context, session, redirect, url_for
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
  
@@ -22,6 +25,8 @@ load_dotenv()
 app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100MB
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
+ 
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
  
 # 一時ファイル管理用
 UPLOAD_DIR = tempfile.mkdtemp(prefix="dbm_agent_")
@@ -57,6 +62,7 @@ def login_page():
  
  
 @app.route("/login", methods=["POST"])
+@limiter.limit("5 per minute")
 def login_submit():
     data = request.get_json() or {}
     password = data.get("password", "")
@@ -64,6 +70,11 @@ def login_submit():
         session["authenticated"] = True
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "パスワードが違います"}), 401
+ 
+ 
+@app.errorhandler(429)
+def ratelimit_handler(e):
+    return jsonify({"ok": False, "error": "しばらく待ってから再試行してください"}), 429
  
  
 @app.route("/")
@@ -184,9 +195,14 @@ def process(session_id):
                 "download_name": download_name,
             })
  
+            # アップロードファイルを削除（結果ファイルはダウンロード後に削除）
+            shutil.rmtree(session_dir, ignore_errors=True)
+            original_names.pop(session_id, None)
         except Exception as e:
             traceback.print_exc()
             yield sse_event("error_event", {"message": str(e)})
+            shutil.rmtree(session_dir, ignore_errors=True)
+            original_names.pop(session_id, None)
  
     return Response(
         stream_with_context(generate()),
@@ -209,16 +225,20 @@ def download(session_id, filename):
     if not filepath.exists():
         return jsonify({"error": "ファイルが見つかりません"}), 404
  
-    # 元のテンプレートファイル名でダウンロード
-    dl_name = original_names.get(session_id, filename)
- 
+    # 元のテンプレートファイル名でダウンロード（取得後にdictから削除）
+    dl_name = original_names.pop(session_id, filename)
+
+    @app.after_this_request
+    def remove_result_file(response):
+        filepath.unlink(missing_ok=True)
+        return response
+
     return send_file(
         str(filepath),
         as_attachment=True,
         download_name=dl_name,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
- 
  
 def sse_event(event_type, data):
     """SSEイベント文字列を生成"""
