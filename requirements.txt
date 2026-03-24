@@ -4,6 +4,5 @@ python-dotenv
 requests
 Pillow
 openpyxl
-xlrd>=2.0.1
 gunicorn
 gevent
