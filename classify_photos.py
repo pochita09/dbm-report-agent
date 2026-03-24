@@ -384,7 +384,7 @@ def classify_and_assign(template_path, photo_paths, api_key):
     print(f"{'='*60}")
  
     # 1. テンプレート解析
-    wb = openpyxl.load_workbook(template_path)
+    wb = openpyxl.load_workbook(template_path, keep_vba=True)
     all_slots = []
     slots_by_sheet = {}
     for sheet_name in wb.sheetnames:

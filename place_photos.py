@@ -214,7 +214,7 @@ def place_photos(template_path, output_path, photo_paths, precomputed_slots=None
     print(f"写真配置開始: {Path(template_path).name}")
     print(f"{'='*60}")
  
-    wb = openpyxl.load_workbook(template_path)
+    wb = openpyxl.load_workbook(template_path, keep_vba=True)
     mdw = detect_mdw(wb)
     print(f"  MDW={mdw}（標準フォントから自動検出）")
     tmp_dir = tempfile.mkdtemp()

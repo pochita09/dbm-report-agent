@@ -141,7 +141,7 @@ def process(session_id):
     # テンプレートと写真のパスを取得
     template_path = None
     for f in session_dir.iterdir():
-        if f.suffix == ".xlsx" and f.is_file():
+        if f.suffix in (".xlsx", ".xlsm") and f.is_file():
             template_path = str(f)
             break
  
@@ -188,8 +188,9 @@ def process(session_id):
             # Step 3: 写真配置
             yield sse_event("progress", {"step": "place", "message": "Excelに写真を配置中..."})
  
-            # 保存用ファイル名はsession_idベース（一意性確保）
-            save_name = f"output_{session_id[:8]}.xlsx"
+            # 保存用ファイル名はsession_idベース（一意性確保）、拡張子は元テンプレートに合わせる
+            out_ext = Path(template_path).suffix  # .xlsx or .xlsm
+            save_name = f"output_{session_id[:8]}{out_ext}"
             output_path = str(Path(RESULT_DIR) / save_name)
             place_photos(template_path, output_path, assigned, precomputed_slots=slots_by_sheet)
  
@@ -201,7 +202,6 @@ def process(session_id):
  
             # アップロードファイルを削除（結果ファイルはダウンロード後に削除）
             shutil.rmtree(session_dir, ignore_errors=True)
-            original_names.pop(session_id, None)
         except Exception as e:
             traceback.print_exc()
             yield sse_event("error_event", {"message": str(e)})

@@ -452,7 +452,7 @@
  
     <!-- テンプレートドロップゾーン -->
     <div class="drop-zone" id="drop-template">
-      <input type="file" id="input-template" accept=".xlsx">
+      <input type="file" id="input-template" accept=".xlsx,.xlsm">
       <div class="zone-header">
         <span class="zone-title">フォーマット</span>
         <button class="zone-clear" id="template-clear">クリア</button>
@@ -460,7 +460,7 @@
       <div id="template-empty" class="zone-empty">
         <span class="zone-empty-icon">📄</span>
         <div class="zone-empty-label">クリックまたはドラッグ＆ドロップ</div>
-        <div class="zone-empty-hint">.xlsx ファイル</div>
+        <div class="zone-empty-hint">.xlsx / .xlsm ファイル</div>
       </div>
       <div id="template-info"></div>
     </div>
@@ -633,7 +633,7 @@
   }
  
   const onTemplateFiles = (files) => {
-    const xlsx = Array.from(files).find(f => /\.xlsx$/i.test(f.name));
+    const xlsx = Array.from(files).find(f => /\.xlsm?$/i.test(f.name));
     if (xlsx) {
       templateFile = xlsx;
       renderTemplateInfo();
@@ -667,7 +667,7 @@
       if (!file) continue;
       if (/\.(jpe?g|png)$/i.test(file.name)) {
         photos.push(file);
-      } else if (/\.xlsx$/i.test(file.name)) {
+      } else if (/\.xlsm?$/i.test(file.name)) {
         templates.push(file);
       }
     }
@@ -733,23 +733,32 @@
       d.assignments.forEach(line => addLog(line, 'detail'));
     });
  
-    evtSource.addEventListener('complete', (e) => {
+    evtSource.addEventListener('complete', async (e) => {
       evtSource.close();
       const d = JSON.parse(e.data);
       spinner.style.display = 'none';
       progressTitle.textContent = '完了';
       progressPanel.classList.add('completed');
       btnRun.disabled = false;
- 
-      // 自動ダウンロード
-      const a = document.createElement('a');
-      a.href = d.download_url;
-      a.download = d.download_name || '';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
- 
-      addLog('ダウンロードを開始しました', 'done');
+
+      // Blob方式でダウンロード（プロキシによるファイル改変を回避）
+      addLog('ダウンロード準備中...', 'active');
+      try {
+        const resp = await fetch(d.download_url);
+        if (!resp.ok) throw new Error('ダウンロード失敗: ' + resp.status);
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = d.download_name || 'output.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        markLastDone('ダウンロード完了');
+      } catch (dlErr) {
+        markLastError('ダウンロード失敗: ' + dlErr.message);
+      }
     });
  
     evtSource.addEventListener('error_event', (e) => {
