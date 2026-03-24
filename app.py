@@ -228,13 +228,13 @@ def download(session_id, filename):
     # 元のテンプレートファイル名でダウンロード（取得後にdictから削除）
     dl_name = original_names.pop(session_id, filename)
 
-    @app.after_this_request
-    def remove_result_file(response):
-        filepath.unlink(missing_ok=True)
-        return response
+    # ファイルをメモリに読み込んでから削除（after_this_requestはFlask 3.1で廃止）
+    import io
+    data = filepath.read_bytes()
+    filepath.unlink(missing_ok=True)
 
     return send_file(
-        str(filepath),
+        io.BytesIO(data),
         as_attachment=True,
         download_name=dl_name,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
