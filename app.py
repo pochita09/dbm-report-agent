@@ -111,10 +111,6 @@ def upload():
     if not photos or photos[0].filename == "":
         return jsonify({"error": "写真が選択されていません"}), 400
  
-    MAX_PHOTOS = 30
-    if len(photos) > MAX_PHOTOS:
-        return jsonify({"error": f"写真は{MAX_PHOTOS}枚までです（{len(photos)}枚選択されています）"}), 400
- 
     photo_paths = []
     for photo in photos:
         fname = secure_filename(photo.filename) or f"photo_{len(photo_paths)}.jpg"
