@@ -281,20 +281,17 @@ def call_gemini_api(prompt, photo_paths, api_key):
         },
     }
  
-    # API呼び出し（APIキーはヘッダーで送信し、ログへの漏洩を防止）
+    # API呼び出し
+    url = f"{GEMINI_API_URL}?key={api_key}"
     print(f"  Gemini API呼び出し中... ({len(photo_paths)}枚送信)")
  
     response = requests.post(
-        GEMINI_API_URL,
-        headers={
-            "Content-Type": "application/json",
-            "x-goog-api-key": api_key,
-        },
+        url,
+        headers={"Content-Type": "application/json"},
         json=body,
         timeout=120,
     )
-    if not response.ok:
-        raise RuntimeError(f"Gemini API error: {response.status_code} {response.reason}")
+    response.raise_for_status()
     result = response.json()
  
     # レスポンスからテキスト部分を抽出
@@ -374,10 +371,9 @@ def classify_and_assign(template_path, photo_paths, api_key):
         api_key: Gemini APIキー
  
     Returns:
-        tuple: (assigned_photos, parsed_slots, slots_by_sheet)
+        tuple: (assigned_photos, parsed_slots)
             assigned_photos: スロット順の画像パスリスト（未割り当て=None）
             parsed_slots: 解析済みスロット情報
-            slots_by_sheet: シートごとのスロット情報 {sheet_name: [slot, ...]}
     """
     print(f"\n{'='*60}")
     print(f"AI写真分類開始")
@@ -386,19 +382,17 @@ def classify_and_assign(template_path, photo_paths, api_key):
     # 1. テンプレート解析
     wb = openpyxl.load_workbook(template_path)
     all_slots = []
-    slots_by_sheet = {}
     for sheet_name in wb.sheetnames:
         ws = wb[sheet_name]
         slots, _, _ = detect_photo_slots(ws)
         if slots:
             print(f"  シート '{sheet_name}': {len(slots)}スロット検出")
-            slots_by_sheet[sheet_name] = slots
             all_slots.extend(slots)
     wb.close()
  
     if not all_slots:
         print("  [!] 写真スロットが見つかりません")
-        return [], [], {}
+        return [], []
  
     # 2. スロット情報の解析（作業内容＋状態の分離）
     parsed_slots = parse_slot_info(all_slots)
@@ -431,7 +425,7 @@ def classify_and_assign(template_path, photo_paths, api_key):
     assigned_count = sum(1 for p in assigned if p is not None)
     print(f"\n  完了: {assigned_count}/{len(parsed_slots)}スロットに割り当て")
  
-    return assigned, parsed_slots, slots_by_sheet
+    return assigned, parsed_slots
  
  
 # ============================================================

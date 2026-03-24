@@ -10,13 +10,10 @@ import uuid
 import tempfile
 import traceback
 import secrets
-import shutil
 from pathlib import Path
 from functools import wraps
  
 from flask import Flask, request, jsonify, send_file, Response, stream_with_context, session, redirect, url_for
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
 from dotenv import load_dotenv
 from werkzeug.utils import secure_filename
  
@@ -25,8 +22,6 @@ load_dotenv()
 app = Flask(__name__, static_folder="static")
 app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024  # 100MB
 app.config["SECRET_KEY"] = os.environ.get("SECRET_KEY", secrets.token_hex(32))
- 
-limiter = Limiter(get_remote_address, app=app, default_limits=[])
  
 # 一時ファイル管理用
 UPLOAD_DIR = tempfile.mkdtemp(prefix="dbm_agent_")
@@ -62,7 +57,6 @@ def login_page():
  
  
 @app.route("/login", methods=["POST"])
-@limiter.limit("5 per minute")
 def login_submit():
     data = request.get_json() or {}
     password = data.get("password", "")
@@ -70,11 +64,6 @@ def login_submit():
         session["authenticated"] = True
         return jsonify({"ok": True})
     return jsonify({"ok": False, "error": "パスワードが違います"}), 401
- 
- 
-@app.errorhandler(429)
-def ratelimit_handler(e):
-    return jsonify({"ok": False, "error": "しばらく待ってから再試行してください"}), 429
  
  
 @app.route("/")
@@ -110,10 +99,6 @@ def upload():
     photos = request.files.getlist("photos")
     if not photos or photos[0].filename == "":
         return jsonify({"error": "写真が選択されていません"}), 400
- 
-    MAX_PHOTOS = 30
-    if len(photos) > MAX_PHOTOS:
-        return jsonify({"error": f"写真は{MAX_PHOTOS}枚までです（{len(photos)}枚選択されています）"}), 400
  
     photo_paths = []
     for photo in photos:
@@ -172,7 +157,7 @@ def process(session_id):
             # Step 2: AI分類
             yield sse_event("progress", {"step": "classify", "message": f"AI分類中... ({len(photo_paths)}枚の写真を分析)"})
  
-            assigned, parsed_slots, slots_by_sheet = classify_and_assign(template_path, photo_paths, GEMINI_API_KEY)
+            assigned, parsed_slots = classify_and_assign(template_path, photo_paths, GEMINI_API_KEY)
  
             assigned_count = sum(1 for p in assigned if p is not None)
             yield sse_event("progress", {"step": "classified", "message": f"分類完了: {assigned_count}/{len(parsed_slots)}スロットに割り当て"})
@@ -191,7 +176,7 @@ def process(session_id):
             # 保存用ファイル名はsession_idベース（一意性確保）
             save_name = f"output_{session_id[:8]}.xlsx"
             output_path = str(Path(RESULT_DIR) / save_name)
-            place_photos(template_path, output_path, assigned, precomputed_slots=slots_by_sheet)
+            place_photos(template_path, output_path, assigned)
  
             yield sse_event("progress", {"step": "done", "message": "完了! ダウンロードを開始します"})
             yield sse_event("complete", {
@@ -199,14 +184,9 @@ def process(session_id):
                 "download_name": download_name,
             })
  
-            # アップロードファイルを削除（結果ファイルはダウンロード後に削除）
-            shutil.rmtree(session_dir, ignore_errors=True)
-            original_names.pop(session_id, None)
         except Exception as e:
             traceback.print_exc()
             yield sse_event("error_event", {"message": str(e)})
-            shutil.rmtree(session_dir, ignore_errors=True)
-            original_names.pop(session_id, None)
  
     return Response(
         stream_with_context(generate()),
@@ -222,27 +202,20 @@ def process(session_id):
 @login_required
 def download(session_id, filename):
     """生成されたExcelファイルをダウンロード"""
-    filepath = (Path(RESULT_DIR) / filename).resolve()
-    # パストラバーサル防止: RESULT_DIR配下であることを検証
-    if not str(filepath).startswith(str(Path(RESULT_DIR).resolve())):
-        return jsonify({"error": "不正なパスです"}), 403
+    filepath = Path(RESULT_DIR) / filename
     if not filepath.exists():
         return jsonify({"error": "ファイルが見つかりません"}), 404
  
-    # 元のテンプレートファイル名でダウンロード（取得後にdictから削除）
-    dl_name = original_names.pop(session_id, filename)
-
-    # ファイルをメモリに読み込んでから削除（after_this_requestはFlask 3.1で廃止）
-    import io
-    data = filepath.read_bytes()
-    filepath.unlink(missing_ok=True)
-
+    # 元のテンプレートファイル名でダウンロード
+    dl_name = original_names.get(session_id, filename)
+ 
     return send_file(
-        io.BytesIO(data),
+        str(filepath),
         as_attachment=True,
         download_name=dl_name,
         mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+ 
  
 def sse_event(event_type, data):
     """SSEイベント文字列を生成"""

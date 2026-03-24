@@ -571,16 +571,10 @@
     dropPhotos.classList.toggle('has-files', hasFiles);
   }
  
-  const MAX_PHOTOS = 30;
-
   const onPhotoFiles = (files) => {
     const newFiles = Array.from(files).filter(f => /\.(jpe?g|png)$/i.test(f.name));
     // 追加モード（既存ファイルに追加）
     photoFiles = photoFiles.concat(newFiles);
-    if (photoFiles.length > MAX_PHOTOS) {
-      photoFiles = photoFiles.slice(0, MAX_PHOTOS);
-      alert(`写真は${MAX_PHOTOS}枚までです。${MAX_PHOTOS}枚に制限しました。`);
-    }
     renderPhotoGrid();
     updatePhotoUI();
     updateButton();
