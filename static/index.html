@@ -633,7 +633,7 @@
   }
  
   const onTemplateFiles = (files) => {
-    const xlsx = Array.from(files).find(f => /\.xlsm?$/i.test(f.name));
+    const xlsx = Array.from(files).find(f => /\.(xlsx|xlsm)$/i.test(f.name));
     if (xlsx) {
       templateFile = xlsx;
       renderTemplateInfo();
@@ -667,7 +667,7 @@
       if (!file) continue;
       if (/\.(jpe?g|png)$/i.test(file.name)) {
         photos.push(file);
-      } else if (/\.xlsm?$/i.test(file.name)) {
+      } else if (/\.(xlsx|xlsm)$/i.test(file.name)) {
         templates.push(file);
       }
     }
