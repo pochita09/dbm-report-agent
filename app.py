@@ -39,6 +39,23 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 # セッション内の元ファイル名を保持する辞書
 original_names = {}
 
+# 対応するテンプレート拡張子
+TEMPLATE_EXTS = {".xlsx", ".xlsm", ".xltx", ".xltm"}
+
+# 入力拡張子 → 出力拡張子のマッピング
+OUTPUT_EXT_MAP = {
+    ".xlsx": ".xlsx",
+    ".xlsm": ".xlsm",
+    ".xltx": ".xlsx",   # テンプレート形式 → 通常形式
+    ".xltm": ".xlsm",   # マクロ付きテンプレート → マクロ付き通常形式
+}
+
+# 拡張子 → MIMEタイプのマッピング
+MIME_TYPE_MAP = {
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".xlsm": "application/vnd.ms-excel.sheet.macroEnabled.12",
+}
+
 
 # ============================================================
 # パスワード認証
@@ -149,9 +166,8 @@ def process(session_id):
 
     # テンプレートと写真のパスを取得
     template_path = None
-    template_exts = {".xlsx", ".xlsm"}
     for f in session_dir.iterdir():
-        if f.suffix.lower() in template_exts and f.is_file():
+        if f.suffix.lower() in TEMPLATE_EXTS and f.is_file():
             template_path = str(f)
             break
 
@@ -168,8 +184,13 @@ def process(session_id):
         if f.suffix.lower() in exts
     ])
 
-    # ダウンロード用ファイル名（元のテンプレート名を使用）
-    download_name = original_names.get(session_id, "output.xlsx")
+    # 出力ファイルの拡張子を入力形式に応じて決定
+    input_ext = Path(template_path).suffix.lower()
+    output_ext = OUTPUT_EXT_MAP.get(input_ext, ".xlsx")
+
+    # ダウンロード用ファイル名（元のテンプレート名を使用、拡張子は出力形式に合わせる）
+    original_name = original_names.get(session_id, "output.xlsx")
+    download_name = str(Path(original_name).with_suffix(output_ext))
 
     def generate():
         try:
@@ -198,8 +219,8 @@ def process(session_id):
             # Step 3: 写真配置
             yield sse_event("progress", {"step": "place", "message": "Excelに写真を配置中..."})
 
-            # 保存用ファイル名はsession_idベース（一意性確保）
-            save_name = f"output_{session_id[:8]}.xlsx"
+            # 保存用ファイル名はsession_idベース（一意性確保）、拡張子は出力形式に合わせる
+            save_name = f"output_{session_id[:8]}{output_ext}"
             output_path = str(Path(RESULT_DIR) / save_name)
             place_photos(template_path, output_path, assigned)
 
@@ -247,11 +268,15 @@ def download(session_id, filename):
     data = filepath.read_bytes()
     filepath.unlink(missing_ok=True)
 
+    # MIMEタイプを拡張子に応じて設定
+    ext = Path(dl_name).suffix.lower()
+    mime_type = MIME_TYPE_MAP.get(ext, MIME_TYPE_MAP[".xlsx"])
+
     return send_file(
         io.BytesIO(data),
         as_attachment=True,
         download_name=dl_name,
-        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        mimetype=mime_type,
     )
 
 

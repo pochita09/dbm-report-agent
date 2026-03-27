@@ -384,7 +384,10 @@ def place_photos(template_path, output_path, photo_paths):
     mdw = wb_info["mdw"]
     print(f"  MDW={mdw}（XMLから取得: フォント '{wb_info['font_name']}'）")
 
-    wb = openpyxl.load_workbook(template_path)
+    # マクロ付き形式(.xlsm/.xltm)はkeep_vba=Trueで開く
+    ext = Path(template_path).suffix.lower()
+    keep_vba = ext in ('.xlsm', '.xltm')
+    wb = openpyxl.load_workbook(template_path, keep_vba=keep_vba)
     tmp_dir = tempfile.mkdtemp()
     total_placed = 0
 
