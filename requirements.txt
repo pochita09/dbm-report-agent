@@ -1,7 +1,8 @@
 flask
+flask-limiter
 python-dotenv
 requests
 Pillow
 openpyxl
 gunicorn
-gevent  
+gevent
