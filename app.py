@@ -230,9 +230,8 @@ def process(session_id):
                 "download_name": download_name,
             })
 
-            # アップロードファイルを削除（結果ファイルはダウンロード後に削除）
+            # アップロードファイルを削除（結果ファイルとoriginal_namesはダウンロード後に削除）
             shutil.rmtree(session_dir, ignore_errors=True)
-            original_names.pop(session_id, None)
 
         except Exception as e:
             traceback.print_exc()
