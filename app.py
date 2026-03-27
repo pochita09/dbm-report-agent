@@ -91,7 +91,12 @@ def upload():
     original_names[session_id] = original_template_name
  
     # サーバー保存用にはsecure_filenameを使用
-    template_name = secure_filename(template_file.filename) or "template.xlsx"
+    # secure_filenameは日本語を除去するため、拡張子だけ残るケースがある
+    template_name = secure_filename(template_file.filename)
+    if not template_name or '.' not in template_name:
+        # 元ファイルの拡張子を保持
+        ext = Path(original_template_name).suffix.lower() or ".xlsx"
+        template_name = "template" + ext
     template_path = session_dir / template_name
     template_file.save(str(template_path))
  
@@ -102,7 +107,10 @@ def upload():
  
     photo_paths = []
     for photo in photos:
-        fname = secure_filename(photo.filename) or f"photo_{len(photo_paths)}.jpg"
+        fname = secure_filename(photo.filename)
+        if not fname or '.' not in fname:
+            ext = Path(photo.filename or "").suffix.lower() or ".jpg"
+            fname = f"photo_{len(photo_paths)}{ext}"
         fpath = photo_dir / fname
         photo.save(str(fpath))
         photo_paths.append(str(fpath))
@@ -125,8 +133,9 @@ def process(session_id):
  
     # テンプレートと写真のパスを取得
     template_path = None
+    template_exts = {".xlsx", ".xlsm"}
     for f in session_dir.iterdir():
-        if f.suffix == ".xlsx" and f.is_file():
+        if f.suffix.lower() in template_exts and f.is_file():
             template_path = str(f)
             break
  
