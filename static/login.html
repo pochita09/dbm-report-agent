@@ -6,9 +6,9 @@
 <title>ログイン - 作業報告書 写真配置ツール</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
- 
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
- 
+
   :root {
     --bg: #f0f4f0;
     --surface: #ffffff;
@@ -20,7 +20,7 @@
     --error: #e05555;
     --radius: 12px;
   }
- 
+
   body {
     font-family: 'Noto Sans JP', sans-serif;
     background: var(--bg);
@@ -31,7 +31,7 @@
     justify-content: center;
     padding: 24px;
   }
- 
+
   .login-card {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -42,19 +42,19 @@
     box-shadow: 0 2px 12px rgba(0,0,0,0.06);
     text-align: center;
   }
- 
+
   .login-card h1 {
     font-size: 18px;
     font-weight: 700;
     margin-bottom: 6px;
   }
- 
+
   .login-card p {
     font-size: 13px;
     color: var(--text-sub);
     margin-bottom: 28px;
   }
- 
+
   .login-input {
     width: 100%;
     padding: 12px 16px;
@@ -66,11 +66,11 @@
     transition: border-color 0.2s;
     margin-bottom: 16px;
   }
- 
+
   .login-input:focus {
     border-color: var(--accent);
   }
- 
+
   .login-btn {
     width: 100%;
     background: var(--accent);
@@ -85,20 +85,28 @@
     transition: all 0.2s;
     letter-spacing: 0.03em;
   }
- 
+
   .login-btn:hover {
     background: var(--accent-hover);
   }
- 
+
   .login-error {
     color: var(--error);
     font-size: 13px;
     margin-top: 12px;
     display: none;
   }
- 
+
   .login-error.visible {
     display: block;
+  }
+
+  .login-error.locked {
+    background: #fef2f2;
+    border: 1px solid var(--error);
+    border-radius: 8px;
+    padding: 12px;
+    font-weight: 500;
   }
 </style>
 </head>
@@ -114,14 +122,26 @@
   const passwordInput = document.getElementById('password');
   const loginBtn = document.getElementById('login-btn');
   const errorMsg = document.getElementById('error-msg');
- 
+
+  const MAX_ATTEMPTS = 5;
+  let attempts = 0;
+  let lockedUntil = 0;
+
   async function doLogin() {
     const password = passwordInput.value;
     if (!password) return;
- 
+
+    // ロック中かチェック
+    const now = Date.now();
+    if (now < lockedUntil) {
+      const remaining = Math.ceil((lockedUntil - now) / 1000);
+      showLocked(remaining);
+      return;
+    }
+
     loginBtn.textContent = '確認中...';
     loginBtn.disabled = true;
- 
+
     try {
       const res = await fetch('/login', {
         method: 'POST',
@@ -129,24 +149,66 @@
         body: JSON.stringify({ password }),
       });
       const data = await res.json();
- 
+
       if (data.ok) {
         window.location.href = '/';
-      } else {
-        errorMsg.textContent = data.error || 'パスワードが違います';
-        errorMsg.classList.add('visible');
-        passwordInput.value = '';
-        passwordInput.focus();
+        return;
       }
+
+      if (res.status === 429) {
+        // サーバー側レート制限
+        attempts = MAX_ATTEMPTS;
+        lockedUntil = Date.now() + 60000;
+        showLocked(60);
+        startCountdown();
+      } else {
+        attempts++;
+        const remaining = MAX_ATTEMPTS - attempts;
+        if (remaining <= 0) {
+          lockedUntil = Date.now() + 60000;
+          showLocked(60);
+          startCountdown();
+        } else {
+          errorMsg.textContent = `パスワードが違います（残り${remaining}回）`;
+          errorMsg.classList.remove('locked');
+          errorMsg.classList.add('visible');
+        }
+      }
+      passwordInput.value = '';
+      passwordInput.focus();
     } catch (e) {
       errorMsg.textContent = '通信エラーが発生しました';
+      errorMsg.classList.remove('locked');
       errorMsg.classList.add('visible');
     }
- 
+
     loginBtn.textContent = 'ログイン';
     loginBtn.disabled = false;
   }
- 
+
+  function showLocked(seconds) {
+    errorMsg.innerHTML = `🔒 ログインがロックされました<br>あと <span id="countdown">${seconds}</span> 秒お待ちください`;
+    errorMsg.classList.add('visible', 'locked');
+    loginBtn.disabled = true;
+  }
+
+  function startCountdown() {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (now >= lockedUntil) {
+        clearInterval(interval);
+        attempts = 0;
+        errorMsg.classList.remove('visible', 'locked');
+        loginBtn.disabled = false;
+        passwordInput.focus();
+        return;
+      }
+      const remaining = Math.ceil((lockedUntil - now) / 1000);
+      const el = document.getElementById('countdown');
+      if (el) el.textContent = remaining;
+    }, 1000);
+  }
+
   loginBtn.addEventListener('click', doLogin);
   passwordInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') doLogin();
