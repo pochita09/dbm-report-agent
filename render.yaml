@@ -7,6 +7,10 @@ services:
     envVars:
       - key: GEMINI_API_KEY
         sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: APP_PASSWORD
+        sync: false
       - key: PYTHON_VERSION
         value: 3.12.0
  
