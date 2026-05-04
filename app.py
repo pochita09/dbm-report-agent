@@ -39,6 +39,9 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD", "")
 # セッション内の元ファイル名を保持する辞書
 original_names = {}
 
+# 処理中セッションIDの重複実行防止
+processing_sessions = set()
+
 # 対応するテンプレート拡張子
 TEMPLATE_EXTS = {".xlsx", ".xlsm", ".xltx", ".xltm"}
 
@@ -164,6 +167,10 @@ def process(session_id):
     if not session_dir.exists():
         return jsonify({"error": "セッションが見つかりません"}), 404
 
+    if session_id in processing_sessions:
+        return jsonify({"error": "このセッションはすでに処理中です"}), 409
+    processing_sessions.add(session_id)
+
     # テンプレートと写真のパスを取得
     template_path = None
     for f in session_dir.iterdir():
@@ -172,6 +179,7 @@ def process(session_id):
             break
 
     if not template_path:
+        processing_sessions.discard(session_id)
         return Response(
             sse_event("error_event", {"message": "テンプレートファイルが見つかりません"}),
             mimetype="text/event-stream",
@@ -238,6 +246,8 @@ def process(session_id):
             yield sse_event("error_event", {"message": str(e)})
             shutil.rmtree(session_dir, ignore_errors=True)
             original_names.pop(session_id, None)
+        finally:
+            processing_sessions.discard(session_id)
 
     return Response(
         stream_with_context(generate()),
